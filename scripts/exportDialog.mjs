@@ -42,10 +42,10 @@ function defaultSaveName() {
 
 function dialogContent(characters) {
   const rows = characters.map(actor => `
-    <label class="flexrow" style="align-items:center;gap:.5rem;margin:.25rem 0">
-      <input type="checkbox" name="actor.${actor.id}" ${actor.hasPlayerOwner ? 'checked' : ''}>
-      <img src="${actor.img}" width="24" height="24" style="border:none">
-      <span>${foundry.utils.escapeHTML(actor.name)}</span>
+    <label style="display:flex;align-items:center;gap:.5rem;margin:.25rem 0">
+      <input type="checkbox" name="actor.${actor.id}" ${actor.hasPlayerOwner ? 'checked' : ''} style="flex:0 0 auto">
+      <img src="${actor.img}" alt="" style="flex:0 0 28px;width:28px;height:28px;object-fit:cover;border-radius:50%;border:none">
+      <span style="flex:1 1 auto">${foundry.utils.escapeHTML(actor.name)}</span>
     </label>`).join('')
   return `
     <div class="form-group">
