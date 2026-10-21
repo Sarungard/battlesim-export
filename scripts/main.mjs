@@ -11,8 +11,8 @@ Hooks.once('init', () => {
 Hooks.on('renderActorDirectory', (_app, element) => {
   if (game.system.id !== 'dnd5e') return
   const root = element instanceof HTMLElement ? element : element[0]
-  const footer = root.querySelector('.directory-footer')
-  if (!footer || footer.querySelector('[data-battlesim-export]')) return
+  if (root.querySelector('[data-battlesim-export]')) return
+  const footer = root.querySelector('.directory-footer') ?? root.querySelector('footer') ?? root
   footer.appendChild(exportButton())
 })
 

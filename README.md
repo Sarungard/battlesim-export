@@ -58,4 +58,5 @@ npm run package
 
 ## Requirements
 
-Foundry VTT 12 or 13 with the dnd5e system 4.0 or newer (activities-based items). Verified with dnd5e 5.1.10.
+Foundry VTT 12 to 14 with the dnd5e system 4.0 or newer (activities-based items).
+Live-tested on Foundry 13.351 with dnd5e 5.1.10; the fields and helpers it uses were audited against dnd5e 6.0.6 and the Foundry 14 API.

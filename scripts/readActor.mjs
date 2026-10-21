@@ -74,7 +74,8 @@ function joinRolls(rolls, includeMod) {
     .map(roll => {
       const parts = roll.parts.filter(part => includeMod || part !== '@mod')
       if (!parts.length) return ''
-      return new Roll(parts.join(' + '), roll.data).formula
+      const RollClass = foundry.dice?.Roll ?? globalThis.Roll
+      return new RollClass(parts.join(' + '), roll.data).formula
     })
     .filter(Boolean)
     .join(' + ')

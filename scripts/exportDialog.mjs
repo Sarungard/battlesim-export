@@ -13,7 +13,7 @@ export async function openExportDialog() {
         label: game.i18n.localize('BATTLESIM.Export'),
         icon: 'fa-solid fa-file-export',
         default: true,
-        callback: (_event, button) => new FormDataExtended(button.form).object,
+        callback: (_event, button) => new (foundry.applications.ux?.FormDataExtended ?? globalThis.FormDataExtended)(button.form).object,
       },
       { action: 'cancel', label: game.i18n.localize('BATTLESIM.Cancel'), icon: 'fa-solid fa-xmark' },
     ],
