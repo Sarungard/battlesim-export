@@ -4,9 +4,10 @@ import { slugify } from './convert.mjs'
 export function readActor(actor) {
   const system = actor.system
   const spell = system.attributes.spell ?? {}
+  const classes = mapValues(actor.classes ?? {}, cls => cls.system.levels)
   return {
     name: actor.name,
-    level: system.details.level,
+    level: system.details.level || Object.values(classes).reduce((sum, levels) => sum + levels, 0),
     pb: system.attributes.prof,
     hp: system.attributes.hp.max,
     ac: system.attributes.ac.value,
@@ -17,7 +18,7 @@ export function readActor(actor) {
     spellAttack: spell.attack ?? system.attributes.prof + (spell.mod ?? 0),
     slots: readSlots(system.spells),
     pactSlots: { max: system.spells?.pact?.max ?? 0, level: system.spells?.pact?.level ?? 0 },
-    classes: mapValues(actor.classes ?? {}, cls => cls.system.levels),
+    classes,
     features: readFeatures(actor),
     weapons: actor.itemTypes.weapon.filter(item => item.system.equipped).map(readWeapon).filter(Boolean),
     spells: actor.itemTypes.spell.map(readSpell),
@@ -46,8 +47,12 @@ function readFeatures(actor) {
   return Array.from(slugs)
 }
 
+function activitiesOf(item) {
+  return Array.from(item.system.activities ?? [])
+}
+
 function readWeapon(item) {
-  const activity = item.system.activities?.getByType?.('attack')?.[0]
+  const activity = activitiesOf(item).find(a => a.type === 'attack')
   if (!activity) return null
   const attackMode = pickAttackMode(item)
   const rolls = activity.getDamageConfig(attackMode ? { attackMode } : {}).rolls ?? []
@@ -56,9 +61,14 @@ function readWeapon(item) {
     toHit: parseInt(activity.labels?.modifier) || 0,
     damage: joinRolls(rolls, true),
     damageWithoutMod: joinRolls(rolls, false),
+    extraDamage: unlimitedDamageActivities(item).map(a => joinRolls(a.getDamageConfig().rolls ?? [], true)).filter(Boolean),
     attackType: activity.attack?.type?.value ?? 'melee',
     properties: Array.from(item.system.properties ?? []),
   }
+}
+
+function unlimitedDamageActivities(item) {
+  return activitiesOf(item).filter(a => a.type === 'damage' && !(a.consumption?.targets?.length))
 }
 
 function pickAttackMode(item) {
@@ -70,11 +80,11 @@ function pickAttackMode(item) {
 }
 
 function joinRolls(rolls, includeMod) {
+  const RollClass = foundry.dice?.Roll ?? globalThis.Roll
   return rolls
     .map(roll => {
       const parts = roll.parts.filter(part => includeMod || part !== '@mod')
       if (!parts.length) return ''
-      const RollClass = foundry.dice?.Roll ?? globalThis.Roll
       return new RollClass(parts.join(' + '), roll.data).formula
     })
     .filter(Boolean)
@@ -88,5 +98,20 @@ function readSpell(item) {
     level: item.system.level,
     method: item.system.method ?? item.system.preparation?.mode ?? 'spell',
     prepared: Number(item.system.prepared ?? item.system.preparation?.prepared ?? 0),
+    activities: activitiesOf(item).map(readSpellActivity),
+  }
+}
+
+function readSpellActivity(activity) {
+  const damage = activity.getDamageConfig ? joinRolls(activity.getDamageConfig().rolls ?? [], true) : ''
+  return {
+    type: activity.type,
+    activation: activity.activation?.type ?? 'action',
+    toHit: parseInt(activity.labels?.modifier) || 0,
+    damage,
+    dc: activity.save?.dc?.value ?? null,
+    halfOnSave: activity.damage?.onSave === 'half',
+    targets: activity.target?.affects?.count ?? null,
+    aoe: !!activity.target?.template?.type,
   }
 }

@@ -26,25 +26,35 @@ game.modules.get('battlesim-export').api.openExportDialog()
 | Max HP, AC, proficiency, level | `hp`, `AC`, derived from the prepared actor |
 | Six saving throw bonuses | `saveBonus` (rounded average, as BattleSim expects) |
 | Best equipped weapon with an attack activity | Action-slot attack with dnd5e's own to-hit and damage (fighting styles, magic bonus and ability modifier included) |
+| Extra "damage" activities on that weapon (Oathbow's 3d6 vs sworn enemy, Flame Tongue's fire) | Folded into the attack's damage, as long as the activity has no limited uses |
 | Extra Attack, fighter 11 / 20 | Attack count 2 / 3 / 4 |
 | Two light weapons | Bonus-action off-hand attack |
-| Best damaging cantrip | Attack (or save-based attack with your spell DC) when no weapon is better |
+| Spell attack activities (Fire Bolt, Scorching Ray, Guiding Bolt) | Attacks with the spell attack bonus; multi-target spells become that many hits |
+| Spell save activities with damage (Fireball, Sacred Flame, Spirit Guardians) | Save-based attacks with your spell DC, half damage on a save when the spell says so, two targets for areas |
+| Plain damage activities (Magic Missile) | Unsaveable hits |
+| Heal activities (Cure Wounds, Healing Word) | Heals on the least-hurt ally; action heals wait for an ally under half HP, bonus-action heals for one at 0 HP |
+| Hold Person, Hold Monster, Blindness/Deafness | Debuffs applying Paralyzed or Blinded with a repeated save |
+| Cantrips | Dice scaled by character level (Eldritch Blast gets beams instead) |
 | Sneak Attack, Uncanny Dodge | Rogue riders scaled by rogue level |
 | Rage | Bonus-action buff with rage damage and resistance, uses per long rest |
 | Action Surge, Second Wind | Extra attack use per short rest, bonus-action self heal |
 | Divine Smite | Extra 2d8 on hit, limited by level 1 and 2 slots |
 | Hunter's Mark | Bonus-action damage buff for the encounter |
-| Cure Wounds, Healing Word | Heals that fire when an ally drops to 0 HP |
-| Bless, Bane, Fireball, Hypnotic Pattern, Heal, Meteor Swarm, Shield | BattleSim's own action templates, limited by spell slots |
+| Bless, Bane, Hypnotic Pattern, Shield | BattleSim's own action templates, limited by spell slots |
 
 Spell uses come from your slots at the spell's level (pact slots reset on a short rest).
 Leveled spells count only when prepared, unless nothing on the sheet is marked prepared.
+Because BattleSim fires the first usable action in a slot, only the strongest damage spell of each
+spell level and the single best cantrip are exported; heals, debuffs and templates always come through.
 
 ## Known limits
 
 - Multiclass characters use the sum of class levels; only the class riders above are modelled.
 - Sharpshooter and Great Weapon Master are not applied (BattleSim treats them as a manual toggle too).
-- Other spells and features are not exported. Open the creature in BattleSim's advanced editor to add them.
+- Spells are exported at their base slot level; upcasting is ignored.
+- A weapon rider only exports if the item has it as a "damage" activity. Older embedded items may only describe it in text; re-import the item from the compendium or add the activity.
+- Vorpal and other critical-hit effects have no BattleSim equivalent and are skipped.
+- Utility and buff spells without a template above are not exported. Open the creature in BattleSim's advanced editor to add them.
 
 ## Development
 

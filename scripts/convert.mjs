@@ -11,42 +11,28 @@ export const SLOT = {
 }
 
 const ENEMY_LEAST_HP = 'enemy with least HP'
+const ENEMY_MOST_HP = 'enemy with most HP'
 const ALLY_LEAST_HP = 'ally with the least HP'
+const ALLY_HIGHEST_DPR = 'ally with the highest DPR'
 const SELF = 'self'
+const AOE_TARGETS = 2
+const UNSAVEABLE_DC = 100
 
+const SLOT_BY_ACTIVATION = { action: SLOT.action, bonus: SLOT.bonusAction, reaction: SLOT.reaction }
+
+// Spells whose effect BattleSim cannot derive from dnd5e activity data. BattleSim's own templates
+// carry no target unless noted, so one is supplied here.
 const SPELL_TEMPLATES = {
-  'bane': { templateName: 'Bane', needsDC: true, condition: 'not used yet' },
-  'bless': { templateName: 'Bless', condition: 'not used yet' },
-  'fireball': { templateName: 'Fireball', needsToHit: true, condition: 'enemy count multiple' },
-  'heal': { templateName: 'Heal', condition: 'ally under half HP' },
-  'hypnotic-pattern': { templateName: 'Hypnotic Pattern', needsDC: true, condition: 'enemy count multiple' },
-  'meteor-swarm': { templateName: 'Meteor Swarm', needsToHit: true, condition: 'enemy count multiple' },
+  'bane': { templateName: 'Bane', needsDC: true, condition: 'not used yet', target: ENEMY_MOST_HP },
+  'bless': { templateName: 'Bless', condition: 'not used yet', target: ALLY_HIGHEST_DPR },
+  'hypnotic-pattern': { templateName: 'Hypnotic Pattern', needsDC: true, condition: 'enemy count multiple', target: ENEMY_MOST_HP },
   'shield': { templateName: 'Shield', condition: 'is under half HP' },
 }
 
-const HEALING_SPELLS = {
-  'cure-wounds': { slot: SLOT.action, dice: '1d8' },
-  'healing-word': { slot: SLOT.bonusAction, dice: '1d4' },
-}
-
-const DAMAGE_CANTRIPS = {
-  'fire-bolt': { die: 'd10', save: false },
-  'eldritch-blast': { die: 'd10', save: false, beams: true },
-  'ray-of-frost': { die: 'd8', save: false },
-  'chill-touch': { die: 'd8', save: false },
-  'shocking-grasp': { die: 'd8', save: false },
-  'produce-flame': { die: 'd8', save: false },
-  'primal-savagery': { die: 'd10', save: false },
-  'thorn-whip': { die: 'd6', save: false },
-  'sacred-flame': { die: 'd8', save: true },
-  'toll-the-dead': { die: 'd12', save: true },
-  'word-of-radiance': { die: 'd6', save: true },
-  'frostbite': { die: 'd6', save: true },
-  'thunderclap': { die: 'd6', save: true },
-  'poison-spray': { die: 'd12', save: true },
-  'acid-splash': { die: 'd6', save: true },
-  'mind-sliver': { die: 'd6', save: true },
-  'vicious-mockery': { die: 'd4', save: true },
+const SAVE_CONDITIONS = {
+  'hold-person': 'Paralyzed',
+  'hold-monster': 'Paralyzed',
+  'blindness-deafness': 'Blinded',
 }
 
 export function slugify(name) {
@@ -57,11 +43,12 @@ export function actorViewToCreature(view, makeId = randomId) {
   const ctx = { view, makeId, has: slug => view.features.includes(slug) }
   const attackCount = extraAttackCount(view)
   const weaponAttacks = buildWeaponAttacks(ctx, attackCount)
+  const spells = buildSpellActions(ctx)
   const actions = [
-    ...buildSpellActions(ctx),
+    ...spells.leveled,
     ...weaponAttacks,
-    ...buildCantripAttacks(ctx),
-    ...buildFallbackAttack(ctx, weaponAttacks),
+    ...spells.cantrips,
+    ...buildFallbackAttack(ctx, weaponAttacks, spells.cantrips),
     ...buildClassRiders(ctx, weaponAttacks[0]),
   ]
   return {
@@ -124,11 +111,25 @@ export function safeFormula(formula) {
   return averageOf(text)
 }
 
+export function cantripDice(level) {
+  if (level >= 17) return 4
+  if (level >= 11) return 3
+  if (level >= 5) return 2
+  return 1
+}
+
+export function scaleCantripFormula(formula, level) {
+  const multiplier = cantripDice(level)
+  if (multiplier === 1) return formula
+  return String(formula).replace(/(\d*)d(\d+)/, (_, count, die) => `${(count === '' ? 1 : Number(count)) * multiplier}d${die}`)
+}
+
 function buildWeaponAttacks(ctx, attackCount) {
   const { view, makeId } = ctx
   const ranked = view.weapons
     .filter(weapon => weapon.toHit !== undefined && weapon.damage)
-    .map(weapon => ({ weapon, expected: averageOf(weapon.damage) }))
+    .map(weapon => ({ weapon, damage: [weapon.damage, ...(weapon.extraDamage ?? [])].join(' + ') }))
+    .map(entry => ({ ...entry, expected: averageOf(entry.damage) }))
     .sort((a, b) => b.expected - a.expected)
   if (!ranked.length) return []
 
@@ -143,7 +144,7 @@ function buildWeaponAttacks(ctx, attackCount) {
     targets: attackCount,
     target: ENEMY_LEAST_HP,
     toHit: main.toHit,
-    dpr: safeFormula(main.damage),
+    dpr: safeFormula(ranked[0].damage),
   }]
 
   const offhand = ranked.slice(1).map(r => r.weapon).find(weapon => isLightMelee(weapon) && isLightMelee(main))
@@ -166,48 +167,9 @@ function isLightMelee(weapon) {
   return weapon.attackType === 'melee' && weapon.properties.includes('lgt')
 }
 
-function cantripDice(level) {
-  if (level >= 17) return 4
-  if (level >= 11) return 3
-  if (level >= 5) return 2
-  return 1
-}
-
-function buildCantripAttacks(ctx) {
+function buildFallbackAttack(ctx, weaponAttacks, cantrips) {
   const { view, makeId } = ctx
-  const cantrips = usableSpells(view)
-    .filter(spell => spell.level === 0 && DAMAGE_CANTRIPS[spell.slug])
-    .map(spell => ({ spell, info: DAMAGE_CANTRIPS[spell.slug] }))
-  if (!cantrips.length) return []
-  const dice = cantripDice(view.level)
-  const ranked = cantrips
-    .map(({ spell, info }) => {
-      const count = info.beams ? 1 : dice
-      const beams = info.beams ? dice : 1
-      const dpr = `${count}${info.die}` + (info.beams && view.features.includes('agonizing-blast') ? ` + ${Math.max(0, view.spellMod)}` : '')
-      return { spell, info, beams, dpr, expected: averageOf(dpr) * beams }
-    })
-    .sort((a, b) => b.expected - a.expected)
-  const best = ranked[0]
-  return [{
-    id: makeId(),
-    name: best.beams > 1 ? `${best.spell.name} x${best.beams}` : best.spell.name,
-    actionSlot: SLOT.action,
-    type: 'atk',
-    freq: 'at will',
-    condition: 'default',
-    targets: best.beams,
-    target: ENEMY_LEAST_HP,
-    toHit: best.info.save ? view.spellDC : view.spellAttack,
-    useSaves: best.info.save || undefined,
-    dpr: best.dpr,
-  }]
-}
-
-function buildFallbackAttack(ctx, weaponAttacks) {
-  const { view, makeId } = ctx
-  const hasAnyAttack = weaponAttacks.length > 0 || usableSpells(view).some(spell => spell.level === 0 && DAMAGE_CANTRIPS[spell.slug])
-  if (hasAnyAttack) return []
+  if (weaponAttacks.length || cantrips.some(action => action.type === 'atk')) return []
   const strMod = view.abilityMods?.str ?? 0
   return [{
     id: makeId(),
@@ -243,54 +205,132 @@ function slotFrequency(view, spellLevel) {
   return null
 }
 
+// Returns { leveled, cantrips }: leveled spells go before weapon attacks (limited uses first),
+// cantrips after them. Only the strongest damage spell per spell level is kept, so one pool of
+// slots is never spent twice.
 function buildSpellActions(ctx) {
-  const { view, makeId } = ctx
-  const actions = []
+  const { view } = ctx
+  const leveled = []
+  const cantrips = []
+  const bestDamageByLevel = new Map()
+
   for (const spell of usableSpells(view)) {
-    if (spell.level === 0) continue
-    const freq = slotFrequency(view, spell.level)
+    const freq = spell.level === 0 ? 'at will' : slotFrequency(view, spell.level)
     if (!freq) continue
-
-    const template = SPELL_TEMPLATES[spell.slug]
-    if (template) {
-      const templateOptions = { templateName: template.templateName }
-      if (template.needsDC) templateOptions.saveDC = view.spellDC
-      if (template.needsToHit) templateOptions.toHit = view.spellDC
-      actions.push({ id: makeId(), type: 'template', freq, condition: template.condition, templateOptions })
-      continue
-    }
-
-    const healing = HEALING_SPELLS[spell.slug]
-    if (healing) {
-      actions.push({
-        id: makeId(),
-        name: spell.name,
-        actionSlot: healing.slot,
-        type: 'heal',
-        freq,
-        condition: 'ally at 0 HP',
-        targets: 1,
-        target: ALLY_LEAST_HP,
-        amount: `${healing.dice} + ${Math.max(0, view.spellMod)}`,
-      })
-      continue
-    }
-
-    if (spell.slug === 'hunter-s-mark') {
-      actions.push({
-        id: makeId(),
-        name: "Hunter's Mark",
-        actionSlot: SLOT.bonusAction,
-        type: 'buff',
-        freq,
-        condition: 'not used yet',
-        targets: 1,
-        target: SELF,
-        buff: { duration: 'entire encounter', damage: '1d6' },
-      })
+    for (const candidate of spellCandidates(ctx, spell, freq)) {
+      if (spell.level === 0) {
+        cantrips.push(candidate)
+      } else if (candidate.expected === undefined) {
+        leveled.push(candidate.action)
+      } else {
+        const current = bestDamageByLevel.get(spell.level)
+        if (!current || candidate.expected > current.expected) bestDamageByLevel.set(spell.level, candidate)
+      }
     }
   }
-  return actions
+
+  const damageSpells = Array.from(bestDamageByLevel.entries())
+    .sort(([a], [b]) => b - a)
+    .map(([, candidate]) => candidate.action)
+  const bestCantrip = cantrips.sort((a, b) => b.expected - a.expected)[0]
+
+  return {
+    leveled: [...damageSpells, ...leveled],
+    cantrips: bestCantrip ? [bestCantrip.action] : [],
+  }
+}
+
+// Each candidate is { action, expected }. `expected` is set only for damage dealers, which compete
+// per spell level; heals, debuffs and templates always come through.
+function spellCandidates(ctx, spell, freq) {
+  const template = SPELL_TEMPLATES[spell.slug]
+  if (template) return [{ action: templateAction(ctx, template, freq) }]
+  if (spell.slug === 'hunter-s-mark') return [{ action: huntersMark(ctx, freq) }]
+
+  const results = []
+  for (const activity of spell.activities ?? []) {
+    const candidate = activityCandidate(ctx, spell, activity, freq)
+    if (candidate) results.push(candidate)
+  }
+  return results
+}
+
+function activityCandidate(ctx, spell, activity, freq) {
+  const { view, makeId } = ctx
+  const slot = SLOT_BY_ACTIVATION[activity.activation] ?? SLOT.action
+  const base = { id: makeId(), name: spell.name, actionSlot: slot, freq }
+  const hasDamage = !!activity.damage
+
+  if (activity.type === 'heal' && hasDamage) {
+    return { action: {
+      ...base,
+      type: 'heal',
+      condition: slot === SLOT.bonusAction ? 'ally at 0 HP' : 'ally under half HP',
+      targets: activity.targets ?? 1,
+      target: ALLY_LEAST_HP,
+      amount: safeFormula(activity.damage),
+    } }
+  }
+
+  if (activity.type === 'save' && !hasDamage) {
+    const condition = SAVE_CONDITIONS[spell.slug]
+    if (!condition) return null
+    return { action: {
+      ...base,
+      type: 'debuff',
+      condition: 'default',
+      targets: activity.aoe ? AOE_TARGETS : activity.targets ?? 1,
+      target: ENEMY_LEAST_HP,
+      saveDC: activity.dc ?? view.spellDC,
+      buff: { duration: 'repeat the save each round', condition },
+    } }
+  }
+
+  if (!hasDamage || !['attack', 'save', 'damage'].includes(activity.type)) return null
+
+  const isCantrip = spell.level === 0
+  const beams = isCantrip && spell.slug === 'eldritch-blast'
+  const dpr = safeFormula(isCantrip && !beams ? scaleCantripFormula(activity.damage, view.level) : activity.damage)
+  const targets = beams ? cantripDice(view.level) : activity.aoe ? AOE_TARGETS : activity.targets ?? 1
+  const action = {
+    ...base,
+    name: beams && targets > 1 ? `${spell.name} x${targets}` : spell.name,
+    type: 'atk',
+    condition: activity.aoe ? 'enemy count multiple' : 'default',
+    targets,
+    target: ENEMY_LEAST_HP,
+    dpr,
+  }
+  if (activity.type === 'attack') {
+    action.toHit = activity.toHit || view.spellAttack
+  } else {
+    action.useSaves = true
+    action.toHit = activity.type === 'damage' ? UNSAVEABLE_DC : activity.dc ?? view.spellDC
+    if (activity.halfOnSave) action.halfOnSave = true
+  }
+  return { action, expected: averageOf(dpr) * targets }
+}
+
+function templateAction(ctx, template, freq) {
+  const { view, makeId } = ctx
+  const templateOptions = { templateName: template.templateName }
+  if (template.needsDC) templateOptions.saveDC = view.spellDC
+  if (template.target) templateOptions.target = template.target
+  return { id: makeId(), type: 'template', freq, condition: template.condition, templateOptions }
+}
+
+function huntersMark(ctx, freq) {
+  return {
+    id: ctx.makeId(),
+    name: "Hunter's Mark",
+    actionSlot: SLOT.bonusAction,
+    type: 'buff',
+    freq,
+    condition: 'not used yet',
+    targets: 1,
+    target: SELF,
+    buff: { duration: 'entire encounter', damage: '1d6' },
+  }
 }
 
 function buildClassRiders(ctx, mainAttack) {
