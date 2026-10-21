@@ -1,0 +1,28 @@
+{
+  "id": "battlesim-export",
+  "title": "BattleSim Export",
+  "description": "Exports the party's player characters as a save file for Trekiros' BattleSim 5e encounter simulator.",
+  "version": "0.1.0",
+  "authors": [
+    { "name": "Sarungard" }
+  ],
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": { "minimum": "4.0.0", "verified": "5.1.10" }
+      }
+    ]
+  },
+  "esmodules": ["scripts/main.mjs"],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  ],
+  "url": "https://github.com/Sarungard/battlesim-export",
+  "license": "MIT"
+}

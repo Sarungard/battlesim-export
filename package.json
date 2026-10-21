@@ -1,0 +1,14 @@
+{
+  "name": "battlesim-export",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Foundry VTT module that exports a dnd5e party as a BattleSim save file",
+  "scripts": {
+    "test": "vitest run",
+    "package": "node tools/package.mjs"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.0"
+  }
+}

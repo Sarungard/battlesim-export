@@ -1,0 +1,11 @@
+{
+  "BATTLESIM.Button": "Export to BattleSim",
+  "BATTLESIM.DialogTitle": "Export party to BattleSim",
+  "BATTLESIM.SaveName": "Save file name",
+  "BATTLESIM.Characters": "Characters to export",
+  "BATTLESIM.Export": "Export",
+  "BATTLESIM.Cancel": "Cancel",
+  "BATTLESIM.NoCharacters": "No characters selected.",
+  "BATTLESIM.Done": "BattleSim save file written for {count} character(s). Load it in BattleSim with Load Adventuring Day, then the upload button.",
+  "BATTLESIM.WrongSystem": "BattleSim Export only works with the dnd5e system."
+}
