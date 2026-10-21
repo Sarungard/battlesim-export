@@ -54,7 +54,7 @@ function dialogContent(characters) {
     </div>
     <fieldset>
       <legend>${game.i18n.localize('BATTLESIM.Characters')}</legend>
-      ${rows}
+      <div style="max-height:50vh;overflow-y:auto;padding-right:.25rem">${rows}</div>
     </fieldset>`
 }
 
