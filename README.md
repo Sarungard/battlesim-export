@@ -3,6 +3,18 @@
 A Foundry VTT module for the dnd5e system that exports your party as a save file for
 [Trekiros' BattleSim](https://github.com/Trekiros/battleSim), the 5e encounter simulator.
 
+## Installation
+
+In Foundry (or Forge: **Game Configuration**, **Modules**, **Install Module**) paste this manifest URL
+into the installer and press **Install**:
+
+```
+https://github.com/Sarungard/battlesim-export/releases/latest/download/module.json
+```
+
+Updates arrive through the same URL whenever a new release is published.
+Zips for a specific version are on the [releases page](https://github.com/Sarungard/battlesim-export/releases).
+
 ## How to use
 
 1. Enable the module in your world.
@@ -64,7 +76,7 @@ npm test
 npm run package
 ```
 
-`npm run package` writes `dist/battlesim-export.zip`, which Forge and Foundry can install directly.
+`npm run package` writes `dist/battlesim-export.zip`, the asset each GitHub release ships next to its `module.json`.
 
 ## Requirements
 
